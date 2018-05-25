@@ -1,5 +1,4 @@
 '''
-/*
 `timescale 1ns / 1ps
 module top(
     input wire myin1,
@@ -19,33 +18,17 @@ module top(
 	end
 	assign myout3 = (!myin1) & myin2 & (!myin3) & ff;
 endmodule
-*/
-
-`timescale 1ns / 1ps
-module top(
-    input wire myin1,
-    input wire myin2,
-    input wire myin3,
-    input wire myin4,
-    output wire myout1,
-    output wire myout2,
-    output wire myout3
-    );
-
-	assign myout1 = myin1 & myin2 & !myin3 & !myin4;
-	assign myout2 = !myin1 & myin2 & !myin3 & !myin4;
-	assign myout3 = myin1 & !myin2 & !myin3 & !myin4;
-endmodule
-
-NET mynet LOC=FBxx;
 '''
 
 import random
 
 random.seed(0)
 
-nin = 4
-nout = 16
+# last one that doesn't completly explode
+if 1:
+    nin = 40
+    nout = 16
+
 
 print '`timescale 1ns / 1ps'
 print 'module top('
