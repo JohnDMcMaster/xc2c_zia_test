@@ -102,12 +102,12 @@ def run_fb_both():
     # Use all inputs
     if 1:
         fb_i = 40
-        fb_o = (64 - fb_i) / 4
+        fb_o = (64 - fb_i) / FBS
     # Use all outputs
     # uses all the pins...
     if 0:
         fb_o = 16
-        fb_i = 40 - fb_o * 4
+        fb_i = 40 - fb_o * FBS
     assert fb_i > 0
     assert fb_o > 0
     MOD_I = fb_i
