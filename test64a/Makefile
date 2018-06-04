@@ -1,4 +1,5 @@
 all:
+	mkdir -p xst/projnav.tmp/
 	python gen.py >top.v
 	xst -intstyle ise -ifn "top.xst" -ofn "top.syr"
 	ngdbuild -intstyle ise -dd _ngo -i -p xc2c64a-VQ100-5 top.ngc top.ngd
