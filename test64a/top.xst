@@ -10,8 +10,7 @@ run
 -opt_mode Speed
 -opt_level 1
 -iuc NO
-# needed to get the lower level net constraint directives applied
--keep_hierarchy No
+-keep_hierarchy Yes
 -netlist_hierarchy As_Optimized
 -rtlview Yes
 -hierarchy_separator /
