@@ -25,7 +25,6 @@
 *.unroutes
 *.ut
 *.xpi
-*.xst
 *_bitgen.xwbt
 *_envsettings.html
 *_map.map
