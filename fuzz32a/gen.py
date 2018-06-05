@@ -268,6 +268,8 @@ def run_clkout():
     ERROR:Cpld:848 - Insufficient number of output pins.  This design needs at least
        32 but only 31 left after allocating other resources.
     weird
+    One of the pins is I only
+    Since CLK goes to dedicated CLK pin, this leaves only 31 pins for output
     '''
 
     FBS = 2
@@ -490,12 +492,65 @@ def run_zia():
         print
         gen_fb_module(fbn, fb_i=fb_i, fb_o=fb_o, ff=True)
 
+def run_fb2_in1_sweep():
+    '''
+    Try all 16 possible FB1.out_* => FB.in_1
+    See how this changes FB2 ZIA
+
+    Saturate connections best we can  as is
+
+    Function Mcells   FB Inps  Pterms   IO       CTC      CTR      CTS      CTE     
+    Block    Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot
+    FB1      16/16*    16/40    16/56    16/16*   0/1      0/1      0/1      0/1
+    FB2      16/16*    16/40    16/56    15/16    0/1      0/1      0/1      0/1
+             -----    -------  -------   -----    ---      ---      ---      ---
+    Total    32/32     32/80    32/112   31/32    0/2      0/2      0/2      0/2 
+
+    '''
+
+    FBS = 2
+    print '`timescale 1ns / 1ps'
+    print
+    # top
+    module_name = 'top'
+
+    fb_os = {1: 16, 2: 15}
+    fb_i0 = 40
+
+    pins = []
+    pins += [('input', 'clk')]
+    pins += [('output', 'out_%d' % i) for i in xrange(sum(fb_os.values()))]
+    module_header(module_name, pins)
+
+    print
+
+    print '    wire clk_buf;'
+    print '    BUFG bufg(.I(clk), .O(clk_buf));'
+    print
+
+    for fbi in xrange(FBS):
+        fbn = fbi + 1
+        print
+
+        pins = [('clk', 'clk_buf')]
+        pins += [('in_%d' % i, "1'b0") for i in xrange(fb_i0)]
+        pins += [('out_%d' % i, 'out_%d' % (i + fbi * fb_os[1])) for i in xrange(fb_os[fbn])]
+        module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
+            pins)
+    print 'endmodule'
+
+    print
+    gen_fb_shift_module(1)
+    print
+    gen_fb_shift_module(2)
+
+
 #run_fb2()
 #run_fb_both()
 #run_fb_ff()
 #run_zia()
 #run_inflated()
 #run_inflated2()
-run_clkout()
+run_fb2_in1_sweep()
 
 
