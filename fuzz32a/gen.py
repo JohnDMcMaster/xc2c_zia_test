@@ -58,8 +58,8 @@ def gen_fb_module(fbn, fb_i=FB_I, fb_o=FB_O, ff=False, feedback=False):
         for outi in xrange(fb_o):
             terms = [randnot() + 'in_%d' % i for i in xrange(fb_i)]
             if feedback:
-                terms += [randnot() + 'loc_out_%d' % i for i in xrange(fb_o)]
-            print '        ff_%d <= %s;' % (outi, ' & '.join(terms))
+                terms += [randnot() + 'out_%d' % i for i in xrange(fb_o)]
+            print '        ff_%d <= %s;' % (outi, ' | '.join(terms))
         print '    end'
     else:
         for i in xrange(fb_o):
@@ -74,7 +74,41 @@ def gen_fb_module(fbn, fb_i=FB_I, fb_o=FB_O, ff=False, feedback=False):
         for fboi in xrange(fb_o):
             # assign myout1 = myin1 & myin2 & !myin3 & !myin4;
             terms = [randnot() + 'in_%d' % i for i in xrange(fb_i)]
-            print '    assign loc_out_%d = %s;' % (fboi, ' & '.join(terms))
+            print '    assign loc_out_%d = %s;' % (fboi, ' | '.join(terms))
+    print 'endmodule'
+
+def gen_fb_shift_module(fbn):
+    fb_i = FB_I
+    fb_o = FB_O
+
+    module_name = 'my_FB%d' % fbn
+    pins = (
+        [('input', 'clk')] +
+        [('input', 'in_%d' % i) for i in xrange(fb_i)] +
+        [('output', 'out_%d' % i) for i in xrange(fb_o)]
+        )
+    module_header(module_name, pins)
+
+    print
+    print
+
+    for i in xrange(fb_o):
+        print
+        # XXX: think can combine these two lines 
+        print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, i, random.randint(0, 1))
+        print '    assign out_%d = ff_%d;' % (i, i)
+
+    print
+    print
+    print '    always @(posedge clk) begin'
+    for outi in xrange(fb_o):
+        terms = [randnot() + 'in_%d' % i for i in xrange(fb_i)]
+        # maybe just do previous?
+        #terms += [randnot() + 'ff_%d' % i for i in xrange(fb_o)]
+        terms += ['ff_%d' % ((outi - 1) % fb_o,)]
+        print '        ff_%d <= %s;' % (outi, ' | '.join(terms))
+    print '    end'
+
     print 'endmodule'
 
 def fb_inout(fbn):
@@ -122,24 +156,155 @@ def run_fb2():
 
     print
     gen_fb_module(fbn, fb_i=fb_i, fb_o=fb_o, ff=ff)
-    if 0:
-        print '''
-module my_FB2(
-        input wire in_0,
-        input wire in_1,
-        input wire in_2,
-        input wire in_3,
-        input wire in_4,
-        input wire in_5,
-        input wire in_6,
-        input wire in_7,
-        (* LOC="FB2", keep="true", DONT_TOUCH="true" *) output wire out_0,
-        (* LOC="FB2", keep="true", DONT_TOUCH="true" *) output wire out_1);
 
-    assign out_0 = in_0 & in_1 & in_2 & in_3 & in_4 & in_5 & in_6 & in_7;
-    assign out_1 = in_0 & in_1 & in_2 & in_3 & in_4 & in_5 & in_6 & in_7;
-endmodule
-'''
+def run_inflated():
+    ''' to use a lot of logic, only using a few pins
+    Should be easy to shift through the FB I think
+    '''
+    fbn = 2
+    ff = True
+    print '`timescale 1ns / 1ps'
+    print
+    # top
+    module_name = 'top'
+    fb_o = FB_O
+    fb_i = N_PINS - fb_o
+
+    fb_o = 2
+    fb_i = 8
+
+    pins = []
+    if ff:
+        pins += [('input', 'clk')]
+    pins += [('input', 'in_%d' % i) for i in xrange(fb_i)]
+    pins += [('output', 'out_%d' % i) for i in xrange(fb_o)]
+    module_header(module_name, pins)
+
+    print
+
+    if ff:
+        print '    wire clk_buf;'
+        print '    BUFG bufg(.I(clk), .O(clk_buf));'
+        print
+
+    pins = []
+    if ff:
+        pins += [('clk', 'clk_buf')]
+    pins += [('in_%d' % i, 'in_%d' % i) for i in xrange(fb_i)]
+    pins += [('out_%d' % i, 'out_%d' % i) for i in xrange(fb_o)]
+    module_connect('my_FB%s' % fbn, 'fb%d' % fbn, pins)
+    print 'endmodule'
+
+    print
+    gen_fb_shift_module(fbn)
+
+def run_inflated2():
+    ''' to use a lot of logic, only using a few pins
+    Should be easy to shift through the FB I think
+    '''
+    fbn = 2
+    ff = True
+    print '`timescale 1ns / 1ps'
+    print
+    # top
+    module_name = 'top'
+    fb_o = FB_O
+    fb_i = N_PINS - fb_o
+
+    fb_o = 2
+    fb_i = 8
+
+    pins = []
+    if ff:
+        pins += [('input', 'clk')]
+    pins += [('input', 'in_%d' % i) for i in xrange(fb_i)]
+    pins += [('output', 'out_%d' % i) for i in xrange(fb_o)]
+    module_header(module_name, pins)
+
+    print
+
+    if ff:
+        print '    wire clk_buf;'
+        print '    BUFG bufg(.I(clk), .O(clk_buf));'
+        print
+
+    pins = []
+    if ff:
+        pins += [('clk', 'clk_buf')]
+    pins += [('in_%d' % i, 'in_%d' % i) for i in xrange(fb_i)]
+    pins += [('out_%d' % i, 'out_%d' % i) for i in xrange(fb_o)]
+    module_connect('my_FB%s' % fbn, 'fb%d' % fbn, pins)
+    print 'endmodule'
+
+    print
+    gen_fb_shift_module(1)
+    print
+    gen_fb_shift_module(2)
+
+def run_clkout():
+    '''
+    Proof of concept using all outputs but no inputs
+    This is important as it fixes all the paths in place for a given FB pair
+    For some reason only outputs that connect to a pin can be LOC'd it seems
+
+    fb_o = 4
+    Function Mcells   FB Inps  Pterms   IO       CTC      CTR      CTS      CTE     
+    Block    Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot
+    FB1      16/16*    16/40    16/56     4/16    0/1      0/1      0/1      0/1
+    FB2      16/16*    16/40    16/56     4/16    0/1      0/1      0/1      0/1
+             -----    -------  -------   -----    ---      ---      ---      ---
+    Total    32/32     32/80    32/112    8/32    0/2      0/2      0/2      0/2
+
+    fb_o = 15
+    Function Mcells   FB Inps  Pterms   IO       CTC      CTR      CTS      CTE     
+    Block    Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot
+    FB1      16/16*    16/40    16/56    15/16    0/1      0/1      0/1      0/1
+    FB2      16/16*    16/40    16/56    15/16    0/1      0/1      0/1      0/1
+             -----    -------  -------   -----    ---      ---      ---      ---
+    Total    32/32     32/80    32/112   30/32    0/2      0/2      0/2      0/2 
+
+
+    fb_o = 16
+    ERROR:Cpld:848 - Insufficient number of output pins.  This design needs at least
+       32 but only 31 left after allocating other resources.
+    weird
+    '''
+
+    FBS = 2
+    print '`timescale 1ns / 1ps'
+    print
+    # top
+    module_name = 'top'
+
+    fb_o = 15
+    fb_i0 = 40
+
+    pins = []
+    pins += [('input', 'clk')]
+    pins += [('output', 'out_%d' % i) for i in xrange(FBS * fb_o)]
+    module_header(module_name, pins)
+
+    print
+
+    print '    wire clk_buf;'
+    print '    BUFG bufg(.I(clk), .O(clk_buf));'
+    print
+
+    for fbi in xrange(FBS):
+        fbn = fbi + 1
+        print
+
+        pins = [('clk', 'clk_buf')]
+        pins += [('in_%d' % i, "1'b0") for i in xrange(fb_i0)]
+        pins += [('out_%d' % i, 'out_%d' % (i + fbi * fb_o)) for i in xrange(fb_o)]
+        module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
+            pins)
+    print 'endmodule'
+
+    print
+    gen_fb_shift_module(1)
+    print
+    gen_fb_shift_module(2)
 
 def run_fb_both():
     '''Instantiates several FB with shared inputs, connecting outputs directly to I/O'''
@@ -325,8 +490,12 @@ def run_zia():
         print
         gen_fb_module(fbn, fb_i=fb_i, fb_o=fb_o, ff=True)
 
-run_fb2()
+#run_fb2()
 #run_fb_both()
 #run_fb_ff()
 #run_zia()
+#run_inflated()
+#run_inflated2()
+run_clkout()
+
 

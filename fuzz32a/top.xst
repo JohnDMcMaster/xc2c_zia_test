@@ -1,7 +1,7 @@
 set -tmpdir "xst/projnav.tmp"
 set -xsthdpdir "xst"
 run
--ifn top.prj
+-ifn ../top.prj
 -ifmt mixed
 -ofn top
 -ofmt NGC
@@ -25,5 +25,5 @@ run
 -pld_mp YES
 -pld_xp YES
 -pld_ce YES
--wysiwyg NO
+-wysiwyg YES
 -equivalent_register_removal YES

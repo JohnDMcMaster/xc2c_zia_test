@@ -1,7 +1,11 @@
 all:
+	mkdir -p build
+	cd build && $(MAKE) -f ../Makefile allb
+
+allb:
 	mkdir -p xst/projnav.tmp/
-	python gen.py >top.v
-	xst -intstyle ise -ifn "top.xst" -ofn "top.syr"
+	python ../gen.py >top.v
+	xst -intstyle ise -ifn "../top.xst" -ofn "top.syr"
 	ngdbuild -intstyle ise -dd _ngo -i -p xc2c32a-CP56-4 top.ngc top.ngd
 	cpldfit -intstyle ise -p xc2c32a-4-CP56 -ofmt vhdl -optimize density -htmlrpt -loc on -slew fast -init low -nogclkopt -nogsropt -nogtsopt -nomlopt -wysiwyg -blkfanin 40 -inputs 40 -pterms 56 -unused keeper -terminate keeper -iostd LVCMOS18 top.ngd
 	# generates prog file
