@@ -138,15 +138,15 @@ def run(jedf, vm6f, fout):
             -ZIABUS[64:49] = FB2 FF[15:0]
             '''
             if 0 <= imux <= 15:
-                add_result('IN[%u].FB1_IBUF[%u]n' % (row, imux), addr, biti)
+                add_result('IN[%u].FB1_IBUF[%u]' % (row, imux), addr, biti)
             elif imux == 16:
-                add_result('IN[%u].IPINn' % (row,), addr, biti)
+                add_result('IN[%u].IPIN' % (row,), addr, biti)
             elif 17 <= imux <= 32:
-                add_result('IN[%u].FB2_IBUF[%u]n' % (row, imux - 17), addr, biti)
+                add_result('IN[%u].FB2_IBUF[%u]' % (row, imux - 17), addr, biti)
             elif 33 <= imux <= 48:
-                add_result('IN[%u].FB1_FF[%u]n' % (row, imux - 33), addr, biti)
+                add_result('IN[%u].FB1_FF[%u]' % (row, imux - 33), addr, biti)
             elif 49 <= imux <= 64:
-                add_result('IN[%u].FB2_FF[%u]n' % (row, imux - 49), addr, biti)
+                add_result('IN[%u].FB2_FF[%u]' % (row, imux - 49), addr, biti)
             else:
                 assert 0
 
