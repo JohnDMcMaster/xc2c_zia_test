@@ -1,4 +1,5 @@
 import random
+import os
 
 random.seed(0)
 
@@ -499,6 +500,7 @@ def run_fb2_in1_sweep():
 
     Saturate connections best we can  as is
 
+    without any connections:
     Function Mcells   FB Inps  Pterms   IO       CTC      CTR      CTS      CTE     
     Block    Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot
     FB1      16/16*    16/40    16/56    16/16*   0/1      0/1      0/1      0/1
@@ -506,6 +508,18 @@ def run_fb2_in1_sweep():
              -----    -------  -------   -----    ---      ---      ---      ---
     Total    32/32     32/80    32/112   31/32    0/2      0/2      0/2      0/2 
 
+    adding a connection:
+    Function Mcells   FB Inps  Pterms   IO       CTC      CTR      CTS      CTE     
+    Block    Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot Used/Tot
+    FB1      16/16*    16/40    16/56    16/16*   0/1      0/1      0/1      0/1
+    FB2      16/16*    17/40    16/56    15/16    0/1      0/1      0/1      0/1
+             -----    -------  -------   -----    ---      ---      ---      ---
+    Total    32/32     33/80    32/112   31/32    0/2      0/2      0/2      0/2 
+
+
+    Result: seems to optimize inputs down to one side of the array
+    Outputs I think have some effect
+    Next text: try adding additional inputs
     '''
 
     FBS = 2
@@ -513,6 +527,9 @@ def run_fb2_in1_sweep():
     print
     # top
     module_name = 'top'
+
+    conn_src = (1, int(os.getenv('ZIA_SRC', '-1')))
+    conn_dst = (2, int(os.getenv('ZIA_DST', '-1')))
 
     fb_os = {1: 16, 2: 15}
     fb_i0 = 40
@@ -528,12 +545,20 @@ def run_fb2_in1_sweep():
     print '    BUFG bufg(.I(clk), .O(clk_buf));'
     print
 
+    def fb_in_val(fbn, i):
+        if (fbn, i) == conn_dst:
+            assert conn_src[0] == 1
+            return 'out_%d' % conn_src[1]
+        else:
+            return "1'b0"
+
     for fbi in xrange(FBS):
         fbn = fbi + 1
         print
 
         pins = [('clk', 'clk_buf')]
-        pins += [('in_%d' % i, "1'b0") for i in xrange(fb_i0)]
+
+        pins += [('in_%d' % i, fb_in_val(fbn, i)) for i in xrange(fb_i0)]
         pins += [('out_%d' % i, 'out_%d' % (i + fbi * fb_os[1])) for i in xrange(fb_os[fbn])]
         module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
             pins)
@@ -544,6 +569,57 @@ def run_fb2_in1_sweep():
     print
     gen_fb_shift_module(2)
 
+def run_fb2_ins_sweep():
+    '''
+    '''
+
+    FBS = 2
+    print '`timescale 1ns / 1ps'
+    print
+    # top
+    module_name = 'top'
+
+    conn_src = (1, int(os.getenv('ZIA_SRC', '-1')))
+    conn_dst = (2, int(os.getenv('ZIA_DST', '-1')))
+
+    fb_os = {1: 16, 2: 15}
+    fb_i0 = 40
+
+    pins = []
+    pins += [('input', 'clk')]
+    pins += [('output', 'out_%d' % i) for i in xrange(sum(fb_os.values()))]
+    module_header(module_name, pins)
+
+    print
+
+    print '    wire clk_buf;'
+    print '    BUFG bufg(.I(clk), .O(clk_buf));'
+    print
+
+    def fb_in_val(fbn, i):
+        #if (fbn, i) == conn_dst:
+        if fbn == conn_dst[0] and i <= conn_dst[1]:
+            assert conn_src[0] == 1
+            return 'out_%d' % conn_src[1]
+        else:
+            return "1'b0"
+
+    for fbi in xrange(FBS):
+        fbn = fbi + 1
+        print
+
+        pins = [('clk', 'clk_buf')]
+
+        pins += [('in_%d' % i, fb_in_val(fbn, i)) for i in xrange(fb_i0)]
+        pins += [('out_%d' % i, 'out_%d' % (i + fbi * fb_os[1])) for i in xrange(fb_os[fbn])]
+        module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
+            pins)
+    print 'endmodule'
+
+    print
+    gen_fb_shift_module(1)
+    print
+    gen_fb_shift_module(2)
 
 #run_fb2()
 #run_fb_both()
@@ -551,6 +627,8 @@ def run_fb2_in1_sweep():
 #run_zia()
 #run_inflated()
 #run_inflated2()
-run_fb2_in1_sweep()
+
+# run_fb2_in1_sweep()
+run_fb2_ins_sweep()
 
 

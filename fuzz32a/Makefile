@@ -24,6 +24,8 @@ allb:
     # ibiswriter -intstyle ise top.pnx top.ibs
 
 	LD_LIBRARY_PATH= awk '/Fitting Status: Successful/{flag=1;next}/CTC - Control Term Clock/{flag=0}flag' top.rpt
+	LD_LIBRARY_PATH= cat top.jed  |grep 'L000... ........\*' >zia_blk0.txt
+	LD_LIBRARY_PATH= cat top.jed  |grep 'L006... ........\*' >zia_blk1.txt
 
 clean:
 	rm -rf build
