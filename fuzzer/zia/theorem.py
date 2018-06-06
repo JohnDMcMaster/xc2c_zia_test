@@ -85,7 +85,8 @@ def run(jedf, vm6f, fout):
     print zia_imuxes
     for fb in xrange(1, 3):
         def add_result(name, addr, biti):
-            name = ('FB%u.' % fb) + name
+            #name = ('FB%u.' % fb) + name
+            name = 'FB.' + name
             # take off base address
             #addr = addr & 0x000FFF
             # 0x17f0
