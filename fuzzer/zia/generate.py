@@ -1,11 +1,12 @@
 import random
 import os
 
-random.seed(0)
+myrand = random.Random()
+myrand.seed(0)
 
 def randnot():
     return ''
-    return random.choice(['', '!'])
+    return myrand.choice(['', '!'])
 
 # External inputs
 FB_I = 40
@@ -50,7 +51,7 @@ def gen_fb_module(fbn, fb_i=FB_I, fb_o=FB_O, ff=False, feedback=False):
         for i in xrange(fb_o):
             print
             # XXX: think can combine these two lines 
-            print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, i, random.randint(0, 1))
+            print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, i, myrand.randint(0, 1))
             print '    assign out_%d = ff_%d;' % (i, i)
 
         print
@@ -96,7 +97,7 @@ def gen_fb_shift_module(fbn):
     for i in xrange(fb_o):
         print
         # XXX: think can combine these two lines 
-        print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, i, random.randint(0, 1))
+        print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, i, myrand.randint(0, 1))
         print '    assign out_%d = ff_%d;' % (i, i)
 
     print
@@ -108,6 +109,45 @@ def gen_fb_shift_module(fbn):
         #terms += [randnot() + 'ff_%d' % i for i in xrange(fb_o)]
         terms += ['ff_%d' % ((outi - 1) % fb_o,)]
         print '        ff_%d <= %s;' % (outi, ' | '.join(terms))
+    print '    end'
+
+    print 'endmodule'
+
+def gen_fb_shift_module2(fbn):
+    fb_i = FB_I
+    fb_o = FB_O
+
+    module_name = 'my_FB%d' % fbn
+    pins = (
+        [('input', 'clk')] +
+        [('input', 'in_%d' % i) for i in xrange(fb_i)] +
+        [('output', 'out_pre_%d' % i) for i in xrange(fb_o)] +
+        [('output', 'out_post_%d' % i) for i in xrange(fb_o)]
+        )
+    module_header(module_name, pins)
+
+    print
+    print
+
+    for outi in xrange(fb_o):
+        print
+        # XXX: think can combine these two lines 
+        print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, outi, myrand.randint(0, 1))
+        print '    assign out_post_%d = ff_%d;' % (outi, outi)
+        #print '    wire out_pre_%d;' % outi
+
+    print
+    for outi in xrange(fb_o):
+        terms = [randnot() + 'in_%d' % i for i in xrange(fb_i)]
+        # FF chain prevents many optimizations
+        terms += ['ff_%d' % ((outi - 1) % fb_o,)]
+        print '    assign out_pre_%d = %s;' % (outi, ' | '.join(terms))
+
+    print
+    print
+    print '    always @(posedge clk) begin'
+    for outi in xrange(fb_o):
+        print '        ff_%d <= out_pre_%d;' % (outi, outi)
     print '    end'
 
     print 'endmodule'
@@ -468,19 +508,19 @@ def run_zia():
         for i in xrange(fb_i):
             # Connect first 8 pins to inputs to make sure they are used
             if i != 0:
-               net = 'in_%d' % i
+                net = 'in_%d' % i
             else:
-                which = random.choice(['input', 'fb'])
+                which = myrand.choice(['input', 'fb'])
                 which = 'fb'
                 if which == 'input':
-                    net = 'in_%d' % random.randint(8, MOD_I - 1)
+                    net = 'in_%d' % myrand.randint(8, MOD_I - 1)
                 else:
                     # hacky...
                     fb_target = FBS - fbi - 1
                     omin = fb_target * fb_o
                     omax = (1 + fb_target) * fb_o - 1
                     assert omin < MOD_O, (omin, 'FBS', FBS, fbi, 'fb_target', fb_target, fb_o)
-                    net = 'out_%d' % random.randint(omin, omax)
+                    net = 'out_%d' % myrand.randint(omin, omax)
             pins.append(('in_%d' % i, net))
 
         module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
@@ -569,8 +609,21 @@ def run_fb2_in1_sweep():
     print
     gen_fb_shift_module(2)
 
-def run_fb2_ins_sweep():
+def run_fuzzer():
     '''
+    There are 40 inputs on each FB
+
+    General notes:
+    -ZIA bus is 65 wide
+        Each FB supplying 16 pre-FF output + 16 post-FF output => 2 * 32 => 64
+        Dedicated input
+    -40 FB inputs
+    -Each FB input can attach to one of 6 bus wires (+ vdd and ground)
+    -Total number connections (bits to solve): 6 * 40 = 240
+    -If was split evenly among bus: 240 / 65 = 3.7
+    -It seems in general things can connect to 3 or 4 inputs, so never specify something more than 3 times for now 
+
+    Note pins (expect for the dedicated input) do not appear on ZIA
     '''
 
     FBS = 2
@@ -583,17 +636,38 @@ def run_fb2_ins_sweep():
     conn_dst = (2, int(os.getenv('ZIA_DST', '-1')))
 
     fb_os = {1: 16, 2: 15}
-    fb_i0 = 40
+    # zia_w = 65
+    fb_ins = 40
 
     pins = []
+    # Will get placed on CLK pin
     pins += [('input', 'clk')]
-    pins += [('output', 'out_%d' % i) for i in xrange(sum(fb_os.values()))]
+    # dedicated input: with all other I/O allocated, will be forced to this pin
+    pins += [('input', 'ded_in')]
+    # Use all outputs
+    for fb, outputs in fb_os.items():
+        pins += [('output', 'fb%u_out_post_%d' % (fb, i)) for i in xrange(outputs)]
     module_header(module_name, pins)
 
-    print
-
+    # Make sure clock gets routed correctly
     print '    wire clk_buf;'
     print '    BUFG bufg(.I(clk), .O(clk_buf));'
+    print
+
+    for fbi in xrange(FBS):
+        print
+        fbn = fbi + 1
+        for outi in xrange(FB_O):
+            print '    wire fb%u_out_pre_%u;' % (fbn, outi)
+            if outi >= fb_os[fbn]:
+                print '    wire fb%u_out_post_%u; //no pin' % (fbn, outi)
+    print
+
+    for fbi in xrange(FBS):
+        print
+        fbn = fbi + 1
+        for ini in xrange(FB_I):
+            print '    wire fb%u_in_%u;' % (fbn, ini)
     print
 
     def fb_in_val(fbn, i):
@@ -610,16 +684,16 @@ def run_fb2_ins_sweep():
 
         pins = [('clk', 'clk_buf')]
 
-        pins += [('in_%d' % i, fb_in_val(fbn, i)) for i in xrange(fb_i0)]
-        pins += [('out_%d' % i, 'out_%d' % (i + fbi * fb_os[1])) for i in xrange(fb_os[fbn])]
-        module_connect('my_FB%s' % fbn, 'fb%d' % fbn,
-            pins)
+        pins += [('in_%d' % i, 'fb%d_in_%d' % (fbn, i)) for i in xrange(fb_ins)]
+        pins += [('out_pre_%d' % i, 'fb%d_out_pre_%d' % (fbn, i)) for i in xrange(FB_O)]
+        pins += [('out_post_%d' % i, 'fb%d_out_post_%d' % (fbn, i)) for i in xrange(FB_O)]
+        module_connect('my_FB%s' % fbn, 'fb%d' % fbn, pins)
     print 'endmodule'
 
     print
-    gen_fb_shift_module(1)
+    gen_fb_shift_module2(1)
     print
-    gen_fb_shift_module(2)
+    gen_fb_shift_module2(2)
 
 #run_fb2()
 #run_fb_both()
@@ -629,4 +703,4 @@ def run_fb2_ins_sweep():
 #run_inflated2()
 
 # run_fb2_in1_sweep()
-run_fb2_ins_sweep()
+run_fuzzer()
