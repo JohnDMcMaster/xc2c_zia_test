@@ -141,12 +141,52 @@ def run_fuzzer():
                 print '    wire fb%u_out_post_%u; //no pin' % (fbn, outi)
     print
 
-    for fbi in xrange(FBS):
+    '''
+    Assign FB inputs randomly
+    Each wire can be assigned 3-4 times max, so don't exceed 3
+
+    "65 choose 40"
+    Don't choose the same signal twice on either side since they'll be optimized down to 1 signal
+    ''' 
+    def assign_fb_ins():
+        freqs = {}
+        freqs[('ded_in',)] = 0
+        if 0:
+            for fbn in xrange(1, 3):
+                for ini in xrange(FB_O):
+                    freqs[('out_pre', fbn, ini)] = 0
+                    # FFs setup as ring buffer
+                    freqs[('out_post', fbn, ini)] = 1
+
+        for fbi in xrange(FBS):
+            print
+            fbn = fbi + 1
+            for ini in xrange(FB_I):
+                # lets do something more predictable
+                if fbn == 1 and ini < 16:
+                    src_wire = 'fb%u_%s_%d' % (2, 'out_post', ini)
+                elif fbn == 2 and ini < 16:
+                    src_wire = 'fb%u_%s_%d' % (1, 'out_post', ini)
+                elif fbn == 1 and ini < 32:
+                    src_wire = 'fb%u_%s_%d' % (2, 'out_pre', ini - 16)
+                #elif fbn == 2 and ini < 17:
+                #    src_wire = 'fb%u_%s_%d' % (1, 'out_pre', ini - 16)
+                elif 0 and (fbn == 1 and ini < 40):
+                    while True:
+                        randkey = myrand.choice(freqs.keys())
+                        if 1 or freqs[randkey] < 3:
+                            break
+                    if randkey[0] == 'ded_in':
+                        src_wire = 'ded_in'
+                    else:
+                        where, rand_fbn, rand_ini = randkey
+                        src_wire = 'fb%u_%s_%d' % (rand_fbn, where, rand_ini)
+                    freqs[randkey] += 1
+                else:
+                    src_wire = "1'b0"
+                print '    wire fb%u_in_%u = %s;' % (fbn, ini, src_wire)
         print
-        fbn = fbi + 1
-        for ini in xrange(FB_I):
-            print '    wire fb%u_in_%u;' % (fbn, ini)
-    print
+    assign_fb_ins()
 
     def fb_in_val(fbn, i):
         #if (fbn, i) == conn_dst:
