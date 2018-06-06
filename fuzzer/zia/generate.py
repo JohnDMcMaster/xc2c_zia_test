@@ -25,6 +25,19 @@ def module_header(name, pins):
             eol = ');'
         print '        %s wire %s%s' % (pdir, name, eol)
 
+def module_header2(name, pins):
+    print 'module %s(' % name
+    for pi, (attr, pdir, wtype, name, init) in enumerate(pins):
+        if init:
+            inits = ' = %s' % init
+        else:
+            inits = ''
+        if pi != len(pins) - 1:
+            eol = ','
+        else:
+            eol = ');'
+        print '        %s %s %s %s%s%s' % (attr, pdir, wtype, name, inits, eol)
+
 def module_connect(module_name, instance_name, pins):
     print '    %s %s(' % (module_name, instance_name)
     for pi, (pin_name, net_name) in enumerate(pins):
@@ -117,37 +130,38 @@ def gen_fb_shift_module2(fbn):
     fb_i = FB_I
     fb_o = FB_O
 
+    def attrs(i):
+        locstr = 'LOC="FB%d", ' % fbn
+        # WARNING: xst will hard crash if this line is removed
+        # (LOC'd more pins than exist)
+        if i == 15:
+            locstr = ''
+        return '(* %skeep="true", DONT_TOUCH="true" *)' % locstr
+
     module_name = 'my_FB%d' % fbn
     pins = (
-        [('input', 'clk')] +
-        [('input', 'in_%d' % i) for i in xrange(fb_i)] +
-        [('output', 'out_pre_%d' % i) for i in xrange(fb_o)] +
-        [('output', 'out_post_%d' % i) for i in xrange(fb_o)]
+        [('', 'input', 'wire', 'clk', None)] +
+        [('', 'input', 'wire', 'in_%d' % i, None) for i in xrange(fb_i)] +
+        [('', 'output', 'wire', 'out_pre_%d' % i, None) for i in xrange(fb_o)] +
+        [(attrs(i), 'output', 'reg', 'out_post_%d' % i, '1\'b%d' % myrand.randint(0, 1)) for i in xrange(fb_o)]
         )
-    module_header(module_name, pins)
+    module_header2(module_name, pins)
 
     print
     print
-
-    for outi in xrange(fb_o):
-        print
-        # XXX: think can combine these two lines 
-        print '    (* LOC="FB%d", keep="true", DONT_TOUCH="true" *) reg ff_%d = 1\'b%d;' % (fbn, outi, myrand.randint(0, 1))
-        print '    assign out_post_%d = ff_%d;' % (outi, outi)
-        #print '    wire out_pre_%d;' % outi
 
     print
     for outi in xrange(fb_o):
         terms = [randnot() + 'in_%d' % i for i in xrange(fb_i)]
         # FF chain prevents many optimizations
-        terms += ['ff_%d' % ((outi - 1) % fb_o,)]
+        terms += ['out_post_%d' % ((outi - 1) % fb_o,)]
         print '    assign out_pre_%d = %s;' % (outi, ' | '.join(terms))
 
     print
     print
     print '    always @(posedge clk) begin'
     for outi in xrange(fb_o):
-        print '        ff_%d <= out_pre_%d;' % (outi, outi)
+        print '        out_post_%d <= out_pre_%d;' % (outi, outi)
     print '    end'
 
     print 'endmodule'
@@ -650,9 +664,9 @@ def run_fuzzer():
     module_header(module_name, pins)
 
     # Make sure clock gets routed correctly
+    print
     print '    wire clk_buf;'
     print '    BUFG bufg(.I(clk), .O(clk_buf));'
-    print
 
     for fbi in xrange(FBS):
         print
