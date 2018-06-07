@@ -406,8 +406,7 @@ if 1:
         fb_o = FB_O
 
         def attr_ff(fbn, i):
-            mc = ((i + 1) % 8) + 1
-            return attr_str({"LOC": "FB1_%u" % mc})
+            return attr_str({"LOC": "FB%u_%u" % (fbn, i + 1)})
 
         def gen_header():
             module_name = 'my_FB%d' % fbn
@@ -439,6 +438,65 @@ if 1:
             for outi in xrange(fb_o):
                 terms = []
                 terms += ['pterm_%d' % outi,]
+                print '    assign out_pre_%d = %s;' % (outi, ' | '.join(terms))
+        gen_orterm()
+
+        print
+    
+        def gen_ff():
+            print '    always @(posedge clk) begin'
+            for outi in xrange(fb_o):
+                print '        out_post_%d <= out_pre_%d;' % (outi, outi)
+            print '    end'
+        gen_ff()
+    
+        print 'endmodule'
+
+    def gen_fb_xor(fbn):
+        '''Generate FBs as an XOR ring osc'''
+        fb_i = FB_I
+        fb_o = FB_O
+
+        def attr_ff(fbn, i):
+            return attr_str({"LOC": "FB%u_%u" % (fbn, i + 1)})
+
+        def gen_header():
+            module_name = 'my_FB%d' % fbn
+            pins = (
+                [('', 'input', 'wire', 'clk', None)] +
+                [(attr_oterm(), 'output', 'wire', 'out_pre_%d' % i, None) for i in xrange(fb_o)] +
+                [(attr_ff(fbn, i), 'output', 'reg', 'out_post_%d' % i, '1\'b%d' % myrand.randint(0, 1)) for i in xrange(fb_o)]
+                )
+            module_header2(module_name, pins)
+        gen_header()
+    
+        print
+    
+    
+        '''
+        ff1 <= ...
+        ff2 <= (ff1 & !ff2) | (!ff1 & ff2)
+        ff3 <= (ff2 & !ff3) | (!ff2 & ff3)
+        '''
+        # Connect to previous
+        def gen_pterms():
+            # Generate and terms
+            print '    //P-terms'
+            for pi in xrange(fb_o):
+                wl = 'out_post_%d' % ((pi + 2) % fb_o,)
+                wr = 'out_post_%d' % ((pi + 5) % fb_o,)
+                print '    %s wire pterm_%dl = %s;' % (attr_pterm(), pi, ' & '.join([wl, '!' + wr]))
+                print '    %s wire pterm_%dr = %s;' % (attr_pterm(), pi, ' & '.join(['!' + wl, wr]))
+        gen_pterms()
+    
+        print
+    
+        # Passthrough
+        def gen_orterm():
+            print '    //OR terms'
+            for outi in xrange(fb_o):
+                terms = []
+                terms += ['pterm_%dl' % outi, 'pterm_%dr' % outi]
                 print '    assign out_pre_%d = %s;' % (outi, ' | '.join(terms))
         gen_orterm()
 
@@ -544,7 +602,8 @@ if 1:
         for fbi in xrange(FBS):
             print
             #gen_fb_rand2(fbi + 1)
-            gen_fb_ring(fbi + 1)
+            #gen_fb_ring(fbi + 1)
+            gen_fb_xor(fbi + 1)
 
 
 
